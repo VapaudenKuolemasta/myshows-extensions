@@ -16,7 +16,10 @@
 	settings = {
 		ls : window.localStorage,
 
+		currentValues : {},
+
 		defaultValues : {
+			prior : 'size',
 			param : '720p',
 			threads : 5,
 			hrefList : [
@@ -54,31 +57,34 @@
 		},
 
 		getVar : function( param ){
-			if( this.ls.getItem( param ) === undefined || this.ls.getItem( param ) === null ){
-				return this.defaultValues[ param ];
+			if( this.currentValues[ param ] === undefined || this.currentValues[ param ] === null ){
+				if( this.ls.getItem( param ) === undefined || this.ls.getItem( param ) === null ){
+					this.currentValues[ param ] = this.defaultValues[ param ];
+				}else{
+					this.currentValues[ param ] = typeof this.defaultValues[ param ]=='object'?JSON.parse(this.ls.getItem( param )):this.ls.getItem( param );
+				}
 			}
-			return this.ls.getItem( param );
+			return this.currentValues[ param ];
 		},
 
 		setVar : function( param, value ){
+			this.currentValues[ param ] = value;
 			value = typeof value == 'object' ? JSON.stringify(value) : value;
 			this.ls.setItem( param , value );
 		},
 
-		getVarsList : function(){
-			var list = {}
-			for( param in this.defaultValues){
-				list[ param ] = this.getVar( param );
+		getMenuObjById : function( menuId ){
+			var list = this.getVar('hrefList');
+			for(var t=0; t<list.length; t++ ){
+				if( list[t].id == +menuId ){
+					return list[t];
+				}
 			}
-			return list;
-		},
-
-		setDefaults : function(){
-			for( param in this.defaultValues){
-				this.ls.setItem( param , this.defaultValues[ param ] );
-			}
+			return false;
 		},
 	}
+	// console.info(settings.getMenuObjById( '2' ));
+
 
 	dropDawnMenu = {
 		const_list : [ 
@@ -98,7 +104,7 @@
 			'',
 
 		replace : function(search, replace, subject) {
-			for(var i=0; i<search.length; i++) {
+			for( var i=0; i<search.length; i++) {
 				subject = subject.replace(new RegExp(search[i], 'g'), replace[i]);
 			}
 			return subject;
@@ -106,10 +112,9 @@
 
 		menuHtml : function( menu ){
 			var tdInnerHtml = '<div class="buttonPopup _download _compact red"><ul>';
-			for( i=0; i<menu.length; i++ ){
+			for( var i=0; i<menu.length; i++ ){
 				var obj = menu[i];
-				mgnt = obj.data !== undefined ? ' data-desc_t="'+obj.data.desc_t+'" data-desc_f="'+obj.data.desc_f+'" data-icon_t="'+obj.data.icon_t+'" data-icon_f="'+obj.data.icon_f+'" ' : '';
-				tdInnerHtml += '<li><a target="_blank" href="'+(obj.href)+'"><img '+mgnt+'alt="img" src="'+obj.icon+'">'+(obj.desc)+'</a></li>';
+				tdInnerHtml += '<li data-menu-id="'+obj.id+'"><a target="_blank" href="'+obj.href+'"><img alt="img" src="'+obj.icon+'">'+obj.desc+'</a></li>';
 			}
 			tdInnerHtml += '</ul></div>';
 			return tdInnerHtml;
@@ -132,8 +137,8 @@
 		},
 
 		run : function( list ){
-			var tdInnerHtml = this.menuHtml(typeof settings.getVar('hrefList')=='object'?settings.getVar('hrefList'):JSON.parse(settings.getVar('hrefList')));
-			for( i=0; i<list.length; i++ ){
+			var tdInnerHtml = this.menuHtml( settings.getVar('hrefList') );
+			for( var i=0; i<list.length; i++ ){
 				var td = document.createElement('td');
 				td.innerHTML = this.render( tdInnerHtml, list[i] ); 
 				list[i].appendChild(td);
@@ -141,34 +146,71 @@
 			GM_addStyle( this.style );
 		},
 	}
-
 	dropDawnMenu.run(episodesList);
 
 
 	ajaxHandler = {
 
-		list : {}, // заменить на инит
+		prepare : function( value ){
+			if( settings.getVar('prior') == 'size' ){
+				var res = (/(\d+\.\d+)\s+([MKG]B)/).exec( value );
+				if( null == res ) return 0;
+				value = +res[1] * ( res[2] == 'GB' ? 1000 : ( res[2] == 'GB' ? 0.001 : 1 ) );
+			}
+			return value;
+		},
 
-		getPage : function( episode ){
+		parse : function( nodeList ){
+			var kat = {
+				magnet : 'div.iaconbox a:nth-child(4)',
+				name : '.cellMainLink',
+				size : 'td:nth-child(2)',
+				seed : 'td:nth-child(5)',
+			}
+
+			var tr = nodeList.querySelectorAll('tr:not(.firstr)');
+			var tmp = tr[0];
+			console.info( this.prepare( tmp.querySelector( kat['size'] ).textContent ) );
+			for ( var i=1; i<tr.length; i++ ) {
+			// 	if( this.prepare( tmp.querySelector( kat[ settings.getVar('prior') ] ) )<this.prepare( tr[i].querySelector( kat[ settings.getVar('prior') ] ) ) ){
+
+			// 	}
+
+			};
+		},
+
+		getPage : function( li, data ){
+			var _this = this;
 			GM_xmlhttpRequest({
 				method : "GET",
-				url : 'https://kat.cr/usearch/'+this.list[ episode ],
+				url : li.children[0].getAttribute('href'),
+				responseType : 'document',
 				onload : function( msg ){
-					if( msg ){
-						console.info(msg);
+					// console.info(msg.responseXML);
+					if( msg.responseXML !== null ){
+						_this.parse( msg.responseXML.documentElement.querySelector('.data') );
 					}
 				}
 			});
 		},
 
-		run : function(){
-			for( id in this.list ){
-				this.getPage( id );
+		run : function( list, threadsCount ){
+			for( var i=0; i<list.length; i++ ){
+				var li = list[i].querySelectorAll('.buttonPopup.red li');
+				for( var j=0; j<li.length; j++ ){
+					var dt = settings.getMenuObjById( +li[j].getAttribute('data-menu-id') );
+					if( dt.data !== undefined ){
+						this.getPage( li[j], dt );
+						threadsCount--;
+						continue;
+					}
+				}
+				if( threadsCount == 0 ){
+					break;
+				}
 			}
 		}
 	}
-
-	ajaxHandler.run();
-
+	ajaxHandler.run(episodesList, settings.getVar('threads'));
 
 })();
