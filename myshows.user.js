@@ -11,6 +11,8 @@
  
 (function myshows_extention(){
 
+	var episodesList = document.querySelectorAll('.seasonBlockBody > table > tbody > tr');
+
 	settings = {
 		ls : window.localStorage,
 
@@ -34,6 +36,20 @@
 					desc : 'Искать субтитры к %_SERIAL_NAME_% %_SEASON_EPISODE_% на Addic7ed',
 					icon : 'http://cdn.addic7ed.com/favicon.ico',
 				},
+				{
+					id : 3,
+					status : 1,
+					name : 'Kickass Torrents',
+					href : 'https://kat.cr/usearch/%_SERIAL_NAME_% s%_SEASON_0_%e%_EPISODE_0_%/',
+					desc : 'Искать субтитры к %_SERIAL_NAME_% %_SEASON_EPISODE_% на Addic7ed',
+					icon : 'https://kastatic.com/images/favicon.ico',
+					data : {
+						desc_t : 'Нашел',
+						desc_f : 'Не нашел',
+						icon_t : 'data:image/gif;base64,R0lGODlhDAAMALMPAOXl5ewvErW1tebm5oocDkVFRePj47a2ts0WAOTk5MwVAIkcDesuEs0VAEZGRv///yH5BAEAAA8ALAAAAAAMAAwAAARB8MnnqpuzroZYzQvSNMroUeFIjornbK1mVkRzUgQSyPfbFi/dBRdzCAyJoTFhcBQOiYHyAABUDsiCxAFNWj6UbwQAOw==',
+						icon_f : 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAsAAAALAQMAAACTYuVlAAAABlBMVEX/////AP/GWAgeAAAAAXRSTlMAQObYZgAAACRJREFUCNdjkGdgsG9g0GtgsG4AMUQZGO4nMDx4wAAUTzgARAB1OAh6LxmZMAAAAABJRU5ErkJggg==',
+					}
+				},
 			],
 		},
 
@@ -45,6 +61,7 @@
 		},
 
 		setVar : function( param, value ){
+			value = typeof value == 'object' ? JSON.stringify(value) : value;
 			this.ls.setItem( param , value );
 		},
 
@@ -63,44 +80,79 @@
 		},
 	}
 
-	function getEpisodesList(){
-		var list = document.querySelectorAll('.seasonBlockBody > table > tbody > tr');
+	dropDawnMenu = {
+		const_list : [ 
+			"%_SERIAL_NAME_%",
+			"%_SERIAL_NAME_RUS_%",
+			"%_SEASON_%",
+			"%_SEASON_0_%",
+			"%_EPISODE_%",
+			"%_EPISODE_0_%",
+			"%_REQUEST_PARAM_%"
+		],
 
-		var menu = settings.getVar('hrefList');
-		console.info(menu);
+		style : ''+			
+			'.buttonPopup.red img{padding-right:5px;height:16px;}'+
+			'.buttonPopup.red{background-color:red;}'+
+			'.seasonBlockBody td:last-child{width:24px;padding:0px;}'+
+			'',
 
-		var tdInnerHtml = '<div class="buttonPopup _download _compact red"><ul>';
-		for( i=0; i<menu.length; i++ ){
-			var obj = menu[i];
-			tdInnerHtml += '<li><a target="_blank" href="'+(obj.href)+'"><img alt="img" class="fv_icon" src="'+obj.icon+'">'+(obj.desc)+'</a></li>';
-		}
-		tdInnerHtml += '</ul></div>';
+		replace : function(search, replace, subject) {
+			for(var i=0; i<search.length; i++) {
+				subject = subject.replace(new RegExp(search[i], 'g'), replace[i]);
+			}
+			return subject;
+		},
 
+		menuHtml : function( menu ){
+			var tdInnerHtml = '<div class="buttonPopup _download _compact red"><ul>';
+			for( i=0; i<menu.length; i++ ){
+				var obj = menu[i];
+				mgnt = obj.data !== undefined ? ' data-desc_t="'+obj.data.desc_t+'" data-desc_f="'+obj.data.desc_f+'" data-icon_t="'+obj.data.icon_t+'" data-icon_f="'+obj.data.icon_f+'" ' : '';
+				tdInnerHtml += '<li><a target="_blank" href="'+(obj.href)+'"><img '+mgnt+'alt="img" src="'+obj.icon+'">'+(obj.desc)+'</a></li>';
+			}
+			tdInnerHtml += '</ul></div>';
+			return tdInnerHtml;
+		},
 
-		for( i=0; i<list.length; i++ ){
-			var td = document.createElement('td');
-			td.innerHTML = tdInnerHtml
-			list[i].appendChild(td);
-		}
+		render : function( html, listElement ){
+			var showId = listElement;
+			while( !showId.hasAttribute('data-show-id') ){
+				showId = showId.parentElement;
+			}
+			showId = showId.getAttribute('data-show-id');
+
+			var serial_name = document.getElementById('s'+showId).children[0].children[1].textContent;
+			var serial_name_rus = document.getElementById('s'+showId).children[0].children[0].textContent;
+
+			var tmp = listElement.childNodes[1].textContent.split('x');				
+			var replace = [ serial_name==''?serial_name_rus:serial_name, serial_name_rus, tmp[0], tmp[0]>9?tmp[0]:'0'+tmp[0], tmp[1], tmp[0]>9?tmp[0]:'0'+tmp[0], settings.getVar('param') ]; 
+
+			return this.replace( this.const_list, replace, html ); ;
+		},
+
+		run : function( list ){
+			var tdInnerHtml = this.menuHtml(typeof settings.getVar('hrefList')=='object'?settings.getVar('hrefList'):JSON.parse(settings.getVar('hrefList')));
+			for( i=0; i<list.length; i++ ){
+				var td = document.createElement('td');
+				td.innerHTML = this.render( tdInnerHtml, list[i] ); 
+				list[i].appendChild(td);
+			}
+			GM_addStyle( this.style );
+		},
 	}
-	getEpisodesList();
 
+	dropDawnMenu.run(episodesList);
 
-	// var ll = settings.getVarsList()
-	// console.info( ll.threads );
-
-	queue = {
-		2677896 : 'Community+s06e09',
-	}
 
 	ajaxHandler = {
 
-		list : queue, // заменить на инит
+		list : {}, // заменить на инит
 
 		getPage : function( episode ){
 			GM_xmlhttpRequest({
 				method : "GET",
-				url : 'https://kickass.to/usearch/'+this.list[ episode ],
+				url : 'https://kat.cr/usearch/'+this.list[ episode ],
 				onload : function( msg ){
 					if( msg ){
 						console.info(msg);
