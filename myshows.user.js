@@ -1,7 +1,7 @@
 // ==UserScript==
 // @id 				myshows
 // @name 			Myshows Extentions
-// @version 		1.0
+// @version 		2.0
 // @description 	Ссылки
 // @include 		http://myshows.me/*
 // @match 			http://myshows.me/*
