@@ -14,6 +14,7 @@
 	var episodesList = document.querySelectorAll('.seasonBlockBody > table > tbody > tr');
 
 	settings = {
+
 		ls : window.localStorage,
 
 		currentValues : {},
@@ -27,16 +28,16 @@
 					id : 1,
 					status : 1,
 					name : 'ThePirateBay',
-					href : 'https://piratebay.to/search/%_SERIAL_NAME_%+%_SEASON_EPISODE_%+%_REQUEST_PARAM_%/0/3/0',
-					desc : 'Искать %_SERIAL_NAME_% %_SEASON_EPISODE_% %_REQUEST_PARAM_% на ThePirateBay',
+					href : 'https://piratebay.to/search/0/800/0/%_SERIAL_NAME_%+s%_SEASON_0_%e%_EPISODE_0_%/0/DSeeder/1/',
+					desc : 'Искать %_SERIAL_NAME_% s%_SEASON_0_%e%_EPISODE_0_% %_REQUEST_PARAM_% на ThePirateBay',
 					icon : 'https://piratebay.to/static/img/tpblogo_sm_ny.gif',
 				},
 				{
 					id : 2,
 					status : 1,
 					name : 'Addic7ed',
-					href : 'http://www.addic7ed.com/search.php?search=%_SERIAL_NAME_%+%_SEASON_EPISODE_%',
-					desc : 'Искать субтитры к %_SERIAL_NAME_% %_SEASON_EPISODE_% на Addic7ed',
+					href : 'http://www.addic7ed.com/search.php?search=%_SERIAL_NAME_%+s%_SEASON_0_%e%_EPISODE_0_%/',
+					desc : 'Искать субтитры к %_SERIAL_NAME_% s%_SEASON_0_%e%_EPISODE_0_% на Addic7ed',
 					icon : 'http://cdn.addic7ed.com/favicon.ico',
 				},
 				{
@@ -44,16 +45,30 @@
 					status : 1,
 					name : 'Kickass Torrents',
 					href : 'https://kat.cr/usearch/%_SERIAL_NAME_% s%_SEASON_0_%e%_EPISODE_0_%/',
-					desc : 'Искать субтитры к %_SERIAL_NAME_% %_SEASON_EPISODE_% на Addic7ed',
-					icon : 'https://kastatic.com/images/favicon.ico',
+					desc : 'Ищу магнет %_SERIAL_NAME_% s%_SEASON_0_%e%_EPISODE_0_% на Addic7ed',
+					icon : 'http://kastatic.com/images/favicon.ico',
+				},
+				{
+					id : 4,
+					status : 1,
+					name : 'Kickass Torrents',
+					href : 'https://kat.cr/usearch/%_SERIAL_NAME_% s%_SEASON_0_%e%_EPISODE_0_%/',
+					desc : 'Ищу магнет %_SERIAL_NAME_% s%_SEASON_0_%e%_EPISODE_0_% на Addic7ed',
+					icon : '/shared/img/vfs/ajax-loader.gif',
 					data : {
-						desc_t : 'Нашел',
-						desc_f : 'Не нашел',
 						icon_t : 'data:image/gif;base64,R0lGODlhDAAMALMPAOXl5ewvErW1tebm5oocDkVFRePj47a2ts0WAOTk5MwVAIkcDesuEs0VAEZGRv///yH5BAEAAA8ALAAAAAAMAAwAAARB8MnnqpuzroZYzQvSNMroUeFIjornbK1mVkRzUgQSyPfbFi/dBRdzCAyJoTFhcBQOiYHyAABUDsiCxAFNWj6UbwQAOw==',
 						icon_f : 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAsAAAALAQMAAACTYuVlAAAABlBMVEX/////AP/GWAgeAAAAAXRSTlMAQObYZgAAACRJREFUCNdjkGdgsG9g0GtgsG4AMUQZGO4nMDx4wAAUTzgARAB1OAh6LxmZMAAAAABJRU5ErkJggg==',
 					}
 				},
 			],
+			trackers : {
+				kat : {
+					magnet : 'div.iaconbox a:nth-child(4)',
+					name : '.cellMainLink',
+					size : 'td:nth-child(2)',
+					seed : 'td:nth-child(5)',
+				},
+			},
 		},
 
 		getVar : function( param ){
@@ -83,10 +98,10 @@
 			return false;
 		},
 	}
-	// console.info(settings.getMenuObjById( '2' ));
 
 
 	dropDawnMenu = {
+
 		const_list : [ 
 			"%_SERIAL_NAME_%",
 			"%_SERIAL_NAME_RUS_%",
@@ -97,17 +112,24 @@
 			"%_REQUEST_PARAM_%"
 		],
 
-		style : ''+			
+		style : ''+
 			'.buttonPopup.red img{padding-right:5px;height:16px;}'+
 			'.buttonPopup.red{background-color:red;}'+
 			'.seasonBlockBody td:last-child{width:24px;padding:0px;}'+
 			'',
 
-		replace : function(search, replace, subject) {
+		replace : function( search, replace, subject ) {
 			for( var i=0; i<search.length; i++) {
 				subject = subject.replace(new RegExp(search[i], 'g'), replace[i]);
 			}
 			return subject;
+		},
+
+		closest : function( startElem, destElem ){
+			while( !startElem.matches(destElem) ){
+				startElem = startElem.parentElement;
+			}
+			return startElem;
 		},
 
 		menuHtml : function( menu ){
@@ -121,17 +143,13 @@
 		},
 
 		render : function( html, listElement ){
-			var showId = listElement;
-			while( !showId.hasAttribute('data-show-id') ){
-				showId = showId.parentElement;
-			}
-			showId = showId.getAttribute('data-show-id');
+			showId = this.closest( listElement, '[data-show-id]' ).getAttribute('data-show-id');
 
 			var serial_name = document.getElementById('s'+showId).children[0].children[1].textContent;
 			var serial_name_rus = document.getElementById('s'+showId).children[0].children[0].textContent;
 
-			var tmp = listElement.childNodes[1].textContent.split('x');				
-			var replace = [ serial_name==''?serial_name_rus:serial_name, serial_name_rus, tmp[0], tmp[0]>9?tmp[0]:'0'+tmp[0], tmp[1], tmp[0]>9?tmp[0]:'0'+tmp[0], settings.getVar('param') ]; 
+			var tmp = listElement.childNodes[1].textContent.split('x');
+			var replace = [ (serial_name==''?serial_name_rus:serial_name), serial_name_rus, tmp[0], (tmp[0]>9?tmp[0]:'0'+tmp[0]), tmp[1], (tmp[1]>9?tmp[1]:'0'+tmp[1]), settings.getVar('param') ]; 
 
 			return this.replace( this.const_list, replace, html ); ;
 		},
@@ -151,6 +169,37 @@
 
 	ajaxHandler = {
 
+		haveVisible : true,
+
+		list : [],
+
+		getNextTr : function(){
+			if( this.haveVisible ){
+				for( var i=0; i<this.list.length; i++ ){
+					if( +dropDawnMenu.closest(this.list[i], 'div.seasonBlockBody').offsetHeight !== 0 ){
+						return this.list.splice(i,1)[0];
+					}
+				}
+				this.haveVisible = false;
+			};
+			if( this.list.length > 0 ){
+				return this.list.shift();
+			}
+			return false;
+		},
+
+		getLi : function(){
+			if( ( tr = this.getNextTr() ) !== false ){ // tr - global ai-ai-ai
+				var li = tr.querySelectorAll('.buttonPopup.red li');
+				for( var i=0; i<li.length; i++ ){
+					if( settings.getMenuObjById( +li[i].getAttribute('data-menu-id') ).data !== undefined ){
+						return li[i];
+					}
+				}
+			}
+			return false;
+		},
+
 		prepare : function( value ){
 			if( settings.getVar('prior') == 'size' ){
 				var res = (/(\d+\.\d+)\s+([MKG]B)/).exec( value );
@@ -161,56 +210,55 @@
 		},
 
 		parse : function( nodeList ){
-			var kat = {
-				magnet : 'div.iaconbox a:nth-child(4)',
-				name : '.cellMainLink',
-				size : 'td:nth-child(2)',
-				seed : 'td:nth-child(5)',
-			}
-
+			var kat = settings.getVar('trackers').kat;
 			var tr = nodeList.querySelectorAll('tr:not(.firstr)');
 			var tmp = tr[0];
-			console.info( this.prepare( tmp.querySelector( kat['size'] ).textContent ) );
 			for ( var i=1; i<tr.length; i++ ) {
-			// 	if( this.prepare( tmp.querySelector( kat[ settings.getVar('prior') ] ) )<this.prepare( tr[i].querySelector( kat[ settings.getVar('prior') ] ) ) ){
-
-			// 	}
-
+				var t1 = this.prepare( tmp.querySelector( kat[ settings.getVar('prior') ] ) );
+				var t2 = this.prepare( tr[i].querySelector( kat[ settings.getVar('prior') ] ) );
+				tmp = t1 < t2 ? tr[i] : tmp;
 			};
+			return tmp;
 		},
 
-		getPage : function( li, data ){
+		getPage : function(){
+			if( ( li = this.getLi() ) === false ){
+				return false;
+			}
+			var a = li.children[0];
 			var _this = this;
+			var kat = settings.getVar('trackers').kat;
 			GM_xmlhttpRequest({
 				method : "GET",
-				url : li.children[0].getAttribute('href'),
+				url : a.getAttribute('href'),
 				responseType : 'document',
 				onload : function( msg ){
-					// console.info(msg.responseXML);
 					if( msg.responseXML !== null ){
-						_this.parse( msg.responseXML.documentElement.querySelector('.data') );
+						var tmp = _this.parse( msg.responseXML.documentElement.querySelector('.data') );
+						a.setAttribute('href', tmp.querySelector( kat.magnet ) );
+						a.childNodes[0].setAttribute('src', settings.getMenuObjById( +li.getAttribute('data-menu-id') ).data.icon_t );
+						a.childNodes[1].textContent = '('+
+							_this.prepare( tmp.querySelector( kat.size ).textContent )+
+							' MB) '+tmp.querySelector( kat.name ).textContent;
+					}else{
+						var tmp = _this.parse( msg.responseXML.documentElement.querySelector('.data') );
+						a.childNodes[0].setAttribute('src', settings.getMenuObjById( +li.getAttribute('data-menu-id') ).data.icon_f );
+						a.childNodes[1].textContent = "Магнет не найден";
 					}
-				}
+					_this.getPage();
+				},
+				// onerror нужно реализовать
 			});
 		},
 
-		run : function( list, threadsCount ){
-			for( var i=0; i<list.length; i++ ){
-				var li = list[i].querySelectorAll('.buttonPopup.red li');
-				for( var j=0; j<li.length; j++ ){
-					var dt = settings.getMenuObjById( +li[j].getAttribute('data-menu-id') );
-					if( dt.data !== undefined ){
-						this.getPage( li[j], dt );
-						threadsCount--;
-						continue;
-					}
-				}
-				if( threadsCount == 0 ){
-					break;
-				}
+		run : function( list ){
+			this.list = [].slice.call(list);
+
+			for( var i=0; i<settings.getVar('threads'); i++ ){
+				this.getPage();
 			}
 		}
 	}
-	ajaxHandler.run(episodesList, settings.getVar('threads'));
+	ajaxHandler.run(episodesList);
 
 })();
