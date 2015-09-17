@@ -1,8 +1,8 @@
 // ==UserScript==
 // @id 				myshows
 // @name 			Myshows Extentions
-// @version 		2.0
-// @description 	Ссылки
+// @version 		2.2
+// @description 	Для каждой серии добавляет меню с ссылками на торенты и субтитры и пытается найти магнет.
 // @include 		http://myshows.me/*
 // @match 			http://myshows.me/*
 // @grant 			GM_addStyle
@@ -28,7 +28,7 @@
 					id : 1,
 					status : 1,
 					name : 'ThePirateBay',
-					href : 'https://piratebay.to/search/0/800/0/%_SERIAL_NAME_%+s%_SEASON_0_%e%_EPISODE_0_%/0/DSeeder/1/',
+					href : 'https://piratebay.to/search/0/800/0/%_SERIAL_NAME_%+s%_SEASON_0_%e%_EPISODE_0_%+%_REQUEST_PARAM_%/0/DSeeder/1/',
 					desc : 'Искать %_SERIAL_NAME_% s%_SEASON_0_%e%_EPISODE_0_% %_REQUEST_PARAM_% на ThePirateBay',
 					icon : 'https://piratebay.to/static/img/tpblogo_sm_ny.gif',
 				},
@@ -36,7 +36,7 @@
 					id : 2,
 					status : 1,
 					name : 'Addic7ed',
-					href : 'http://www.addic7ed.com/search.php?search=%_SERIAL_NAME_%+s%_SEASON_0_%e%_EPISODE_0_%/',
+					href : 'http://www.addic7ed.com/search.php?search=%_SERIAL_NAME_%+s%_SEASON_0_%e%_EPISODE_0_%+%_REQUEST_PARAM_%/',
 					desc : 'Искать субтитры к %_SERIAL_NAME_% s%_SEASON_0_%e%_EPISODE_0_% на Addic7ed',
 					icon : 'http://cdn.addic7ed.com/favicon.ico',
 				},
@@ -44,15 +44,23 @@
 					id : 3,
 					status : 1,
 					name : 'Kickass Torrents',
-					href : 'https://kat.cr/usearch/%_SERIAL_NAME_% s%_SEASON_0_%e%_EPISODE_0_%/',
-					desc : 'Ищу магнет %_SERIAL_NAME_% s%_SEASON_0_%e%_EPISODE_0_% на Addic7ed',
+					href : 'https://kat.cr/usearch/%_SERIAL_NAME_% s%_SEASON_0_%e%_EPISODE_0_%+%_REQUEST_PARAM_%/',
+					desc : 'Искать %_SERIAL_NAME_% s%_SEASON_0_%e%_EPISODE_0_% на Kickass Torrents',
 					icon : 'http://kastatic.com/images/favicon.ico',
 				},
 				{
 					id : 4,
 					status : 1,
+					name : 'New-rutor',
+					href : 'http://new-rutor.org/search/%_SERIAL_NAME_%+%_REQUEST_PARAM_%/',
+					desc : 'Искать %_SERIAL_NAME_% на New-rutor',
+					icon : 'http://new-rutor.org/parse/s.rutor.org/favicon.ico',
+				},
+				{
+					id : 5,
+					status : 1,
 					name : 'Kickass Torrents',
-					href : 'https://kat.cr/usearch/%_SERIAL_NAME_% s%_SEASON_0_%e%_EPISODE_0_%/',
+					href : 'https://kat.cr/usearch/%_SERIAL_NAME_% s%_SEASON_0_%e%_EPISODE_0_%+%_REQUEST_PARAM_%/',
 					desc : 'Ищу магнет %_SERIAL_NAME_% s%_SEASON_0_%e%_EPISODE_0_% на Addic7ed',
 					icon : '/shared/img/vfs/ajax-loader.gif',
 					data : {
@@ -102,7 +110,7 @@
 
 	dropDawnMenu = {
 
-		const_list : [ 
+		const_list : [
 			"%_SERIAL_NAME_%",
 			"%_SERIAL_NAME_RUS_%",
 			"%_SEASON_%",
@@ -210,8 +218,14 @@
 		},
 
 		parse : function( nodeList ){
+			if( nodeList === null || nodeList === undefined ){
+				return false;
+			}
 			var kat = settings.getVar('trackers').kat;
 			var tr = nodeList.querySelectorAll('tr:not(.firstr)');
+			if( tr === null || tr === undefined ){
+				return false;
+			}
 			var tmp = tr[0];
 			for ( var i=1; i<tr.length; i++ ) {
 				var t1 = this.prepare( tmp.querySelector( kat[ settings.getVar('prior') ] ) );
@@ -221,33 +235,46 @@
 			return tmp;
 		},
 
+		error : function( a, text ){
+			a.childNodes[0].setAttribute('src', settings.getMenuObjById( +li.getAttribute('data-menu-id') ).data.icon_f );
+			a.childNodes[1].textContent = text;
+		},
+
 		getPage : function(){
+			var _this = this;
 			if( ( li = this.getLi() ) === false ){
 				return false;
 			}
 			var a = li.children[0];
-			var _this = this;
 			var kat = settings.getVar('trackers').kat;
 			GM_xmlhttpRequest({
 				method : "GET",
 				url : a.getAttribute('href'),
 				responseType : 'document',
+				timeout : 60*1000,
 				onload : function( msg ){
-					if( msg.responseXML !== null ){
+					if( msg !== null && msg.responseXML !== null ){
 						var tmp = _this.parse( msg.responseXML.documentElement.querySelector('.data') );
-						a.setAttribute('href', tmp.querySelector( kat.magnet ) );
-						a.childNodes[0].setAttribute('src', settings.getMenuObjById( +li.getAttribute('data-menu-id') ).data.icon_t );
-						a.childNodes[1].textContent = '('+
-							_this.prepare( tmp.querySelector( kat.size ).textContent )+
-							' MB) '+tmp.querySelector( kat.name ).textContent;
+						if( tmp !== false ){
+							a.setAttribute('href', tmp.querySelector( kat.magnet ) );
+							a.childNodes[0].setAttribute('src', settings.getMenuObjById( +li.getAttribute('data-menu-id') ).data.icon_t );
+							a.childNodes[1].textContent = '('+
+								_this.prepare( tmp.querySelector( kat.size ).textContent )+
+								' MB) '+tmp.querySelector( kat.name ).textContent;
+						}else{
+							_this.error(a, "Магнет не найден");
+						}
 					}else{
-						var tmp = _this.parse( msg.responseXML.documentElement.querySelector('.data') );
-						a.childNodes[0].setAttribute('src', settings.getMenuObjById( +li.getAttribute('data-menu-id') ).data.icon_f );
-						a.childNodes[1].textContent = "Магнет не найден";
+						_this.error(a, "Сайт вернул пустой ответ");
 					}
 					_this.getPage();
 				},
-				// onerror нужно реализовать
+				onerror : function(){
+					_this.error(a, "Ошибка доступа к сайту");
+				},
+				ontimeout : function(){
+					_this.error(a, "Время ожидания ответа сайта закончилось");
+				},
 			});
 		},
 
