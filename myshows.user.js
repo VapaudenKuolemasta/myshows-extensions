@@ -1,7 +1,7 @@
 // ==UserScript==
 // @id 				myshows
 // @name 			Myshows Extentions
-// @version 		2.2
+// @version 		2.3
 // @description 	Для каждой серии добавляет меню с ссылками на торенты и субтитры и пытается найти магнет.
 // @include 		http://myshows.me/*
 // @match 			http://myshows.me/*
@@ -58,10 +58,22 @@
 				},
 				{
 					id : 5,
-					status : 1,
+					status : 0,
 					name : 'Kickass Torrents',
 					href : 'https://kat.cr/usearch/%_SERIAL_NAME_% s%_SEASON_0_%e%_EPISODE_0_%+%_REQUEST_PARAM_%/',
-					desc : 'Ищу магнет %_SERIAL_NAME_% s%_SEASON_0_%e%_EPISODE_0_% на Addic7ed',
+					desc : 'Ищу магнет %_SERIAL_NAME_% s%_SEASON_0_%e%_EPISODE_0_% на Kickass Torrents',
+					icon : '/shared/img/vfs/ajax-loader.gif',
+					data : {
+						icon_t : 'data:image/gif;base64,R0lGODlhDAAMALMPAOXl5ewvErW1tebm5oocDkVFRePj47a2ts0WAOTk5MwVAIkcDesuEs0VAEZGRv///yH5BAEAAA8ALAAAAAAMAAwAAARB8MnnqpuzroZYzQvSNMroUeFIjornbK1mVkRzUgQSyPfbFi/dBRdzCAyJoTFhcBQOiYHyAABUDsiCxAFNWj6UbwQAOw==',
+						icon_f : 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAsAAAALAQMAAACTYuVlAAAABlBMVEX/////AP/GWAgeAAAAAXRSTlMAQObYZgAAACRJREFUCNdjkGdgsG9g0GtgsG4AMUQZGO4nMDx4wAAUTzgARAB1OAh6LxmZMAAAAABJRU5ErkJggg==',
+					}
+				},
+				{
+					id : 6,
+					status : 1,
+					name : 'EZTV',
+					href : 'https://eztv.ag/search/%_SERIAL_NAME_%+s%_SEASON_0_%e%_EPISODE_0_%+%_REQUEST_PARAM_%/',
+					desc : 'Ищу магнет %_SERIAL_NAME_% s%_SEASON_0_%e%_EPISODE_0_% на EZTV',
 					icon : '/shared/img/vfs/ajax-loader.gif',
 					data : {
 						icon_t : 'data:image/gif;base64,R0lGODlhDAAMALMPAOXl5ewvErW1tebm5oocDkVFRePj47a2ts0WAOTk5MwVAIkcDesuEs0VAEZGRv///yH5BAEAAA8ALAAAAAAMAAwAAARB8MnnqpuzroZYzQvSNMroUeFIjornbK1mVkRzUgQSyPfbFi/dBRdzCAyJoTFhcBQOiYHyAABUDsiCxAFNWj6UbwQAOw==',
@@ -76,7 +88,15 @@
 					size : 'td:nth-child(2)',
 					seed : 'td:nth-child(5)',
 				},
+				eztv : {
+					// html body div#header_holder table.forum_header_border tbody tr.forum_header_border td.forum_thread_post a.epinfo
+					magnet : 'a.magnet',
+					name : 'a.epinfo',
+					size : 'a.epinfo', // Размер брать из title
+					seed : 'a.epinfo', // Размер брать из title
+				},
 			},
+			curTracker : 'eztv',
 		},
 
 		getVar : function( param ){
@@ -144,7 +164,9 @@
 			var tdInnerHtml = '<div class="buttonPopup _download _compact red"><ul>';
 			for( var i=0; i<menu.length; i++ ){
 				var obj = menu[i];
-				tdInnerHtml += '<li data-menu-id="'+obj.id+'"><a target="_blank" href="'+obj.href+'"><img alt="img" src="'+obj.icon+'">'+obj.desc+'</a></li>';
+				if( obj.status != 0 ){
+					tdInnerHtml += '<li data-menu-id="'+obj.id+'"><a target="_blank" href="'+obj.href+'"><img alt="img" src="'+obj.icon+'">'+obj.desc+'</a></li>';
+				}
 			}
 			tdInnerHtml += '</ul></div>';
 			return tdInnerHtml;
@@ -221,15 +243,15 @@
 			if( nodeList === null || nodeList === undefined ){
 				return false;
 			}
-			var kat = settings.getVar('trackers').kat;
+			var tracker = settings.getVar('trackers')[ settings.getVar('curTracker') ];
 			var tr = nodeList.querySelectorAll('tr:not(.firstr)');
 			if( tr === null || tr === undefined ){
 				return false;
 			}
 			var tmp = tr[0];
 			for ( var i=1; i<tr.length; i++ ) {
-				var t1 = this.prepare( tmp.querySelector( kat[ settings.getVar('prior') ] ) );
-				var t2 = this.prepare( tr[i].querySelector( kat[ settings.getVar('prior') ] ) );
+				var t1 = this.prepare( tmp.querySelector( tracker[ settings.getVar('prior') ] ) );
+				var t2 = this.prepare( tr[i].querySelector( tracker[ settings.getVar('prior') ] ) );
 				tmp = t1 < t2 ? tr[i] : tmp;
 			};
 			return tmp;
