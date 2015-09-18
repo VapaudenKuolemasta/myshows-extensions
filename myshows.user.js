@@ -90,8 +90,8 @@
 				},
 				eztv : {
 					// html body div#header_holder table.forum_header_border tbody tr.forum_header_border td.forum_thread_post a.epinfo
-					magnet : 'a.magnet',
 					name : 'a.epinfo',
+					magnet : 'a.magnet',
 					size : 'a.epinfo', // Размер брать из title
 					seed : 'a.epinfo', // Размер брать из title
 				},
