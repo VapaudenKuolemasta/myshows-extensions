@@ -59,20 +59,7 @@
 				{
 					id : 5,
 					status : 1,
-					name : 'Kickass Torrents',
-					href : 'https://kat.cr/usearch/%_SERIAL_NAME_% s%_SEASON_0_%e%_EPISODE_0_%+%_REQUEST_PARAM_%/',
-					desc : 'Ищу магнет для %_SERIAL_NAME_% s%_SEASON_0_%e%_EPISODE_0_%',
-					icon : '/shared/img/vfs/ajax-loader.gif',
-					data : {
-						icon_t : 'data:image/gif;base64,R0lGODlhDAAMALMPAOXl5ewvErW1tebm5oocDkVFRePj47a2ts0WAOTk5MwVAIkcDesuEs0VAEZGRv///yH5BAEAAA8ALAAAAAAMAAwAAARB8MnnqpuzroZYzQvSNMroUeFIjornbK1mVkRzUgQSyPfbFi/dBRdzCAyJoTFhcBQOiYHyAABUDsiCxAFNWj6UbwQAOw==',
-						icon_f : 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAsAAAALAQMAAACTYuVlAAAABlBMVEX/////AP/GWAgeAAAAAXRSTlMAQObYZgAAACRJREFUCNdjkGdgsG9g0GtgsG4AMUQZGO4nMDx4wAAUTzgARAB1OAh6LxmZMAAAAABJRU5ErkJggg==',
-					}
-				},
-				{
-					id : 6,
-					status : 0,
-					name : 'EZTV',
-					href : 'https://eztv.ag/search/%_SERIAL_NAME_%+s%_SEASON_0_%e%_EPISODE_0_%+%_REQUEST_PARAM_%/',
+					name : 'Magnet Finder',
 					desc : 'Ищу магнет для %_SERIAL_NAME_% s%_SEASON_0_%e%_EPISODE_0_%',
 					icon : '/shared/img/vfs/ajax-loader.gif',
 					data : {
@@ -84,19 +71,24 @@
 			trackers : {
 				kat : {
 					magnet : 'div.iaconbox a:nth-child(4)',
+					table : '.data',
 					name : '.cellMainLink',
 					size : 'td:nth-child(2)',
 					seed : 'td:nth-child(5)',
+					href : 'https://kat.cr/usearch/%_SERIAL_NAME_% s%_SEASON_0_%e%_EPISODE_0_% %_REQUEST_PARAM_%/',
+					tr : 'tr:not(.firstr)',
 				},
 				eztv : {
-					// html body div#header_holder table.forum_header_border tbody tr.forum_header_border td.forum_thread_post a.epinfo
-					name : 'a.epinfo',
 					magnet : 'a.magnet',
-					size : 'a.epinfo', // Размер брать из title
-					seed : 'a.epinfo', // Размер брать из title
+					table : 'table.forum_header_border:last-of-type',
+					name : 'a.epinfo',
+					size : 'a.epinfo',
+					seed : 'a.epinfo',
+					href : 'https://eztv.ag/search/%_SERIAL_NAME_%-s%_SEASON_0_%e%_EPISODE_0_%-%_REQUEST_PARAM_%',
+					tr : 'tr.forum_header_border',
 				},
 			},
-			curTracker : 'kat',
+			curTracker : 'eztv',
 		},
 
 		getVar : function( param ){
@@ -165,7 +157,12 @@
 			for( var i=0; i<menu.length; i++ ){
 				var obj = menu[i];
 				if( obj.status != 0 ){
-					tdInnerHtml += '<li data-cur-tracker="'+settings.getVar('curTracker')+'" data-used-trackers="" data-menu-id="'+obj.id+'"><a target="_blank" href="'+obj.href+'"><img alt="img" src="'+obj.icon+'">'+obj.desc+'</a></li>';
+					// Add data attrs with trackers info for magnet links 
+					var trackerData = ( obj.data!==undefined?'data-cur-tracker="'+settings.getVar('curTracker')+'" data-used-trackers="'+settings.getVar('curTracker')+'"':'' );
+					// Choose href attribute wisely
+					var trackerHref = ( obj.href!==undefined?obj.href:settings.getVar('trackers')[ settings.getVar('curTracker') ].href );
+
+					tdInnerHtml += '<li '+trackerData+' data-menu-id="'+obj.id+'"><a target="_blank" href="'+trackerHref+'"><img alt="img" src="'+obj.icon+'">'+obj.desc+'</a></li>';
 				}
 			}
 			tdInnerHtml += '</ul></div>';
@@ -233,6 +230,9 @@
 		prepare : function( value ){
 			if( settings.getVar('prior') == 'size' ){
 				var res = (/(\d+\.\d+)\s+([MKG]B)/).exec( value );
+				if( null == res ){
+					res = (/(\d+\.\d+)\s+([MKG]B)/).exec( value.getAttribute('title') ); // КОСТЫЛЬ!!! Сключительно для eztv
+				} 
 				if( null == res ) return 0;
 				value = +res[1] * ( res[2] == 'GB' ? 1000 : ( res[2] == 'GB' ? 0.001 : 1 ) );
 			}
@@ -244,8 +244,8 @@
 				return false;
 			}
 			var tracker = settings.getVar('trackers')[ settings.getVar('curTracker') ];
-			var tr = nodeList.querySelectorAll('tr:not(.firstr)');
-			if( tr === null || tr === undefined ){
+			var tr = nodeList.querySelectorAll( tracker.tr );
+			if( tr === null || tr === undefined || tr.length === 0 ){
 				return false;
 			}
 			var tmp = tr[0];
@@ -257,12 +257,26 @@
 			return tmp;
 		},
 
-		getNextTracker : function( a ){
+		hasNextTracker : function( a ){
+			var arr = a.parentElement.getAttribute('data-used-trackers').split(',');
+			for( tracker in settings.getVar('trackers') ){
+				// console.info( typeof tracker, ''+tracker.toString(), arr, tracker.indexOf( arr ) );
+				// console.info( ''+tracker.toString(), arr, tracker.indexOf( arr ) );
+				// console.info( arr, tracker.indexOf( arr ) );
+				// console.info( tracker.indexOf( arr ) === -1 );
+				// if( tracker.indexOf( arr ) === -1 ){
+				// 	a.parentElement.setAttribute('data-used-trackers', (a.parentElement.getAttribute('data-used-trackers')+','+tracker) );
+					// a.parentElement.setAttribute('data-cur-tracker', tracker );
+					// this.haveVisible = true;
+					// this.list.push( dropDawnMenu.closest(a, 'tr') );
+				// 	return true;
+				// }
+			}
 			return false;
 		},
 
 		error : function( a, text ){
-			if( this.getNextTracker( a ) ){
+			if( !this.hasNextTracker( a ) ){
 				a.childNodes[0].setAttribute('src', settings.getMenuObjById( +li.getAttribute('data-menu-id') ).data.icon_f );
 				a.childNodes[1].textContent = text;
 			}
@@ -274,7 +288,8 @@
 				return false;
 			}
 			var a = li.children[0];
-			var kat = settings.getVar('trackers').kat;
+			var tracker = settings.getVar('trackers')[ a.parentElement.getAttribute('data-cur-tracker') ];
+			// console.info(a.parentElement.getAttribute('data-cur-tracker'), a.getAttribute('href'));
 			GM_xmlhttpRequest({
 				method : "GET",
 				url : a.getAttribute('href'),
@@ -282,13 +297,13 @@
 				timeout : 60*1000,
 				onload : function( msg ){
 					if( msg !== null && msg.responseXML !== null ){
-						var tmp = _this.parse( msg.responseXML.documentElement.querySelector('.data') );
+						var tmp = _this.parse( msg.responseXML.documentElement.querySelector( tracker.table ) );
 						if( tmp !== false ){
-							a.setAttribute('href', tmp.querySelector( kat.magnet ) );
+							a.setAttribute('href', tmp.querySelector( tracker.magnet ) );
 							a.childNodes[0].setAttribute('src', settings.getMenuObjById( +li.getAttribute('data-menu-id') ).data.icon_t );
 							a.childNodes[1].textContent = '('+
-								_this.prepare( tmp.querySelector( kat.size ).textContent )+
-								' MB) '+tmp.querySelector( kat.name ).textContent;
+								+_this.prepare( tmp.querySelector( tracker.size ) )+
+								' MB) '+tmp.querySelector( tracker.name ).textContent;
 						}else{
 							_this.error(a, "Магнет не найден");
 						}
@@ -317,3 +332,5 @@
 	ajaxHandler.run(episodesList);
 
 })();
+
+
