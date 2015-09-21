@@ -58,10 +58,10 @@
 				},
 				{
 					id : 5,
-					status : 0,
+					status : 1,
 					name : 'Kickass Torrents',
 					href : 'https://kat.cr/usearch/%_SERIAL_NAME_% s%_SEASON_0_%e%_EPISODE_0_%+%_REQUEST_PARAM_%/',
-					desc : 'Ищу магнет %_SERIAL_NAME_% s%_SEASON_0_%e%_EPISODE_0_% на Kickass Torrents',
+					desc : 'Ищу магнет для %_SERIAL_NAME_% s%_SEASON_0_%e%_EPISODE_0_%',
 					icon : '/shared/img/vfs/ajax-loader.gif',
 					data : {
 						icon_t : 'data:image/gif;base64,R0lGODlhDAAMALMPAOXl5ewvErW1tebm5oocDkVFRePj47a2ts0WAOTk5MwVAIkcDesuEs0VAEZGRv///yH5BAEAAA8ALAAAAAAMAAwAAARB8MnnqpuzroZYzQvSNMroUeFIjornbK1mVkRzUgQSyPfbFi/dBRdzCAyJoTFhcBQOiYHyAABUDsiCxAFNWj6UbwQAOw==',
@@ -70,10 +70,10 @@
 				},
 				{
 					id : 6,
-					status : 1,
+					status : 0,
 					name : 'EZTV',
 					href : 'https://eztv.ag/search/%_SERIAL_NAME_%+s%_SEASON_0_%e%_EPISODE_0_%+%_REQUEST_PARAM_%/',
-					desc : 'Ищу магнет %_SERIAL_NAME_% s%_SEASON_0_%e%_EPISODE_0_% на EZTV',
+					desc : 'Ищу магнет для %_SERIAL_NAME_% s%_SEASON_0_%e%_EPISODE_0_%',
 					icon : '/shared/img/vfs/ajax-loader.gif',
 					data : {
 						icon_t : 'data:image/gif;base64,R0lGODlhDAAMALMPAOXl5ewvErW1tebm5oocDkVFRePj47a2ts0WAOTk5MwVAIkcDesuEs0VAEZGRv///yH5BAEAAA8ALAAAAAAMAAwAAARB8MnnqpuzroZYzQvSNMroUeFIjornbK1mVkRzUgQSyPfbFi/dBRdzCAyJoTFhcBQOiYHyAABUDsiCxAFNWj6UbwQAOw==',
@@ -96,7 +96,7 @@
 					seed : 'a.epinfo', // Размер брать из title
 				},
 			},
-			curTracker : 'eztv',
+			curTracker : 'kat',
 		},
 
 		getVar : function( param ){
@@ -165,7 +165,7 @@
 			for( var i=0; i<menu.length; i++ ){
 				var obj = menu[i];
 				if( obj.status != 0 ){
-					tdInnerHtml += '<li data-menu-id="'+obj.id+'"><a target="_blank" href="'+obj.href+'"><img alt="img" src="'+obj.icon+'">'+obj.desc+'</a></li>';
+					tdInnerHtml += '<li data-cur-tracker="'+settings.getVar('curTracker')+'" data-used-trackers="" data-menu-id="'+obj.id+'"><a target="_blank" href="'+obj.href+'"><img alt="img" src="'+obj.icon+'">'+obj.desc+'</a></li>';
 				}
 			}
 			tdInnerHtml += '</ul></div>';
@@ -257,9 +257,15 @@
 			return tmp;
 		},
 
+		getNextTracker : function( a ){
+			return false;
+		},
+
 		error : function( a, text ){
-			a.childNodes[0].setAttribute('src', settings.getMenuObjById( +li.getAttribute('data-menu-id') ).data.icon_f );
-			a.childNodes[1].textContent = text;
+			if( this.getNextTracker( a ) ){
+				a.childNodes[0].setAttribute('src', settings.getMenuObjById( +li.getAttribute('data-menu-id') ).data.icon_f );
+				a.childNodes[1].textContent = text;
+			}
 		},
 
 		getPage : function(){
