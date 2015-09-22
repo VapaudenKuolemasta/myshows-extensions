@@ -78,17 +78,17 @@
 					href : 'https://kat.cr/usearch/%_SERIAL_NAME_% s%_SEASON_0_%e%_EPISODE_0_% %_REQUEST_PARAM_%/',
 					tr : 'tr:not(.firstr)',
 				},
-				eztv : {
-					magnet : 'a.magnet',
-					table : 'table.forum_header_border:last-of-type',
-					name : 'a.epinfo',
-					size : 'a.epinfo',
-					seed : 'a.epinfo',
-					href : 'https://eztv.ag/search/%_SERIAL_NAME_%-s%_SEASON_0_%e%_EPISODE_0_%-%_REQUEST_PARAM_%',
-					tr : 'tr.forum_header_border',
-				},
+				// eztv : {
+				// 	magnet : 'a.magnet',
+				// 	table : 'table.forum_header_border:last-of-type',
+				// 	name : 'a.epinfo',
+				// 	size : 'a.epinfo',
+				// 	seed : 'a.epinfo',
+				// 	href : 'https://eztv.ag/search/%_SERIAL_NAME_%-s%_SEASON_0_%e%_EPISODE_0_%-%_REQUEST_PARAM_%',
+				// 	tr : 'tr.forum_header_border',
+				// },
 			},
-			curTracker : 'eztv',
+			curTracker : 'kat',
 		},
 
 		getVar : function( param ){
@@ -260,17 +260,14 @@
 		hasNextTracker : function( a ){
 			var arr = a.parentElement.getAttribute('data-used-trackers').split(',');
 			for( tracker in settings.getVar('trackers') ){
-				// console.info( typeof tracker, ''+tracker.toString(), arr, tracker.indexOf( arr ) );
-				// console.info( ''+tracker.toString(), arr, tracker.indexOf( arr ) );
-				// console.info( arr, tracker.indexOf( arr ) );
-				// console.info( tracker.indexOf( arr ) === -1 );
-				// if( tracker.indexOf( arr ) === -1 ){
-				// 	a.parentElement.setAttribute('data-used-trackers', (a.parentElement.getAttribute('data-used-trackers')+','+tracker) );
-					// a.parentElement.setAttribute('data-cur-tracker', tracker );
-					// this.haveVisible = true;
-					// this.list.push( dropDawnMenu.closest(a, 'tr') );
-				// 	return true;
-				// }
+				if( arr.indexOf( tracker ) === -1 ){
+					a.parentElement.setAttribute('data-used-trackers', (a.parentElement.getAttribute('data-used-trackers')+','+tracker) );
+					a.parentElement.setAttribute('data-cur-tracker', tracker );
+					a.setAttribute('href', dropDawnMenu.render( settings.getVar('trackers')[ tracker ].href, dropDawnMenu.closest( a, 'tr' ) ) );
+					this.haveVisible = true;
+					this.list.push( dropDawnMenu.closest(a, 'tr') );
+					return true;
+				}
 			}
 			return false;
 		},
@@ -289,7 +286,7 @@
 			}
 			var a = li.children[0];
 			var tracker = settings.getVar('trackers')[ a.parentElement.getAttribute('data-cur-tracker') ];
-			// console.info(a.parentElement.getAttribute('data-cur-tracker'), a.getAttribute('href'));
+			console.info( a.parentElement.getAttribute('data-cur-tracker'), a.getAttribute('href') );
 			GM_xmlhttpRequest({
 				method : "GET",
 				url : a.getAttribute('href'),
@@ -310,7 +307,11 @@
 					}else{
 						_this.error(a, "Сайт вернул пустой ответ");
 					}
-					_this.getPage();
+					if( _this.haveVisible ){
+						_this.getPage();
+					}else{
+						console.info('thread over');
+					}
 				},
 				onerror : function(){
 					_this.error(a, "Ошибка доступа к сайту");
@@ -332,5 +333,3 @@
 	ajaxHandler.run(episodesList);
 
 })();
-
-
