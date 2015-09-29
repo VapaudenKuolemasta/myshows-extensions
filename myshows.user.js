@@ -46,7 +46,7 @@
 					name : 'Kickass Torrents',
 					href : 'https://kat.cr/usearch/%_SERIAL_NAME_% s%_SEASON_0_%e%_EPISODE_0_%+%_REQUEST_PARAM_%/',
 					desc : 'Искать %_SERIAL_NAME_% s%_SEASON_0_%e%_EPISODE_0_% на Kickass Torrents',
-					icon : 'http://kastatic.com/images/favicon.ico',
+					icon : 'https://kastatic.com/images/favicon.ico',
 				},
 				{
 					id : 4,
@@ -78,17 +78,17 @@
 					href : 'https://kat.cr/usearch/%_SERIAL_NAME_% s%_SEASON_0_%e%_EPISODE_0_% %_REQUEST_PARAM_%/',
 					tr : 'tr:not(.firstr)',
 				},
-				// eztv : {
-				// 	magnet : 'a.magnet',
-				// 	table : 'table.forum_header_border:last-of-type',
-				// 	name : 'a.epinfo',
-				// 	size : 'a.epinfo',
-				// 	seed : 'a.epinfo',
-				// 	href : 'https://eztv.ag/search/%_SERIAL_NAME_%-s%_SEASON_0_%e%_EPISODE_0_%-%_REQUEST_PARAM_%',
-				// 	tr : 'tr.forum_header_border',
-				// },
+				eztv : {
+					magnet : 'a.magnet',
+					table : 'table.forum_header_border:last-of-type',
+					name : 'a.epinfo',
+					size : 'a.epinfo',
+					seed : 'a.epinfo',
+					href : 'https://eztv.ag/search/%_SERIAL_NAME_%-s%_SEASON_0_%e%_EPISODE_0_%-%_REQUEST_PARAM_%',
+					tr : 'tr.forum_header_border',
+				},
 			},
-			curTracker : 'kat',
+			curTracker : 'eztv',
 		},
 
 		getVar : function( param ){
@@ -229,9 +229,9 @@
 
 		prepare : function( value ){
 			if( settings.getVar('prior') == 'size' ){
-				var res = (/(\d+\.\d+)\s+([MKG]B)/).exec( value );
+				var res = (/\((\d+\.\d+).+([MKG]B)\)/).exec( value );
 				if( null == res ){
-					res = (/(\d+\.\d+)\s+([MKG]B)/).exec( value.getAttribute('title') ); // КОСТЫЛЬ!!! Сключительно для eztv
+					res = (/(\d+\.{0,1}\d{0,2}).+([MKG]B)/).exec( value.textContent );
 				} 
 				if( null == res ) return 0;
 				value = +res[1] * ( res[2] == 'GB' ? 1000 : ( res[2] == 'GB' ? 0.001 : 1 ) );
@@ -239,13 +239,15 @@
 			return value;
 		},
 
-		parse : function( nodeList ){
+		parse : function( nodeList, tracker ){
 			if( nodeList === null || nodeList === undefined ){
+				console.info('parse::nodelisr error');
 				return false;
 			}
-			var tracker = settings.getVar('trackers')[ settings.getVar('curTracker') ];
+			// var tracker = settings.getVar('trackers')[ settings.getVar('curTracker') ];
 			var tr = nodeList.querySelectorAll( tracker.tr );
 			if( tr === null || tr === undefined || tr.length === 0 ){
+				console.info('parse::tracker.tr error', tr, nodeList.querySelectorAll( tracker.tr ), tracker.tr );
 				return false;
 			}
 			var tmp = tr[0];
@@ -273,6 +275,7 @@
 		},
 
 		error : function( a, text ){
+			console.info('enter error with ', text, ' for ',a.childNodes[1].textContent);
 			if( !this.hasNextTracker( a ) ){
 				a.childNodes[0].setAttribute('src', settings.getMenuObjById( +li.getAttribute('data-menu-id') ).data.icon_f );
 				a.childNodes[1].textContent = text;
@@ -286,16 +289,20 @@
 			}
 			var a = li.children[0];
 			var tracker = settings.getVar('trackers')[ a.parentElement.getAttribute('data-cur-tracker') ];
-			console.info( a.parentElement.getAttribute('data-cur-tracker'), a.getAttribute('href') );
+			console.info( '----------------------------------' );
+			console.info( 'sent ajax ', a.getAttribute('href') );
 			GM_xmlhttpRequest({
 				method : "GET",
 				url : a.getAttribute('href'),
 				responseType : 'document',
 				timeout : 60*1000,
 				onload : function( msg ){
+			console.info( 'ajax onload ', a.getAttribute('href') );
+			console.info( msg.responseXML.documentElement.querySelector( tracker.table ) );
 					if( msg !== null && msg.responseXML !== null ){
-						var tmp = _this.parse( msg.responseXML.documentElement.querySelector( tracker.table ) );
+						var tmp = _this.parse( msg.responseXML.documentElement.querySelector( tracker.table ), tracker );
 						if( tmp !== false ){
+							console.info('all OK for', a.getAttribute('href') );
 							a.setAttribute('href', tmp.querySelector( tracker.magnet ) );
 							a.childNodes[0].setAttribute('src', settings.getMenuObjById( +li.getAttribute('data-menu-id') ).data.icon_t );
 							a.childNodes[1].textContent = '('+
@@ -307,11 +314,7 @@
 					}else{
 						_this.error(a, "Сайт вернул пустой ответ");
 					}
-					if( _this.haveVisible ){
-						_this.getPage();
-					}else{
-						console.info('thread over');
-					}
+					_this.getPage();
 				},
 				onerror : function(){
 					_this.error(a, "Ошибка доступа к сайту");
@@ -325,7 +328,7 @@
 		run : function( list ){
 			this.list = [].slice.call(list);
 
-			for( var i=0; i<settings.getVar('threads'); i++ ){
+			for( var i=0; i<1; i++ ){
 				this.getPage();
 			}
 		}
