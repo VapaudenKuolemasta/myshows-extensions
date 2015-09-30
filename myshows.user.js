@@ -46,7 +46,7 @@
 					name : 'Kickass Torrents',
 					href : 'https://kat.cr/usearch/%_SERIAL_NAME_% s%_SEASON_0_%e%_EPISODE_0_%+%_REQUEST_PARAM_%/',
 					desc : 'Искать %_SERIAL_NAME_% s%_SEASON_0_%e%_EPISODE_0_% на Kickass Torrents',
-					icon : 'http://kastatic.com/images/favicon.ico',
+					icon : 'https://kastatic.com/images/favicon.ico',
 				},
 				{
 					id : 4,
@@ -59,9 +59,8 @@
 				{
 					id : 5,
 					status : 1,
-					name : 'Kickass Torrents',
-					href : 'https://kat.cr/usearch/%_SERIAL_NAME_% s%_SEASON_0_%e%_EPISODE_0_%+%_REQUEST_PARAM_%/',
-					desc : 'Ищу магнет %_SERIAL_NAME_% s%_SEASON_0_%e%_EPISODE_0_% на Kickass Torrents',
+					name : 'Magnet Finder',
+					desc : 'Ищу магнет для %_SERIAL_NAME_% s%_SEASON_0_%e%_EPISODE_0_%',
 					icon : '/shared/img/vfs/ajax-loader.gif',
 					data : {
 						icon_t : 'data:image/gif;base64,R0lGODlhDAAMALMPAOXl5ewvErW1tebm5oocDkVFRePj47a2ts0WAOTk5MwVAIkcDesuEs0VAEZGRv///yH5BAEAAA8ALAAAAAAMAAwAAARB8MnnqpuzroZYzQvSNMroUeFIjornbK1mVkRzUgQSyPfbFi/dBRdzCAyJoTFhcBQOiYHyAABUDsiCxAFNWj6UbwQAOw==',
@@ -72,9 +71,21 @@
 			trackers : {
 				kat : {
 					magnet : 'div.iaconbox a:nth-child(4)',
+					table : '.data',
 					name : '.cellMainLink',
 					size : 'td:nth-child(2)',
 					seed : 'td:nth-child(5)',
+					href : 'https://kat.cr/usearch/%_SERIAL_NAME_% s%_SEASON_0_%e%_EPISODE_0_% %_REQUEST_PARAM_%/',
+					tr : 'tr:not(.firstr)',
+				},
+				eztv : {
+					magnet : 'a.magnet',
+					table : 'table.forum_header_border:last-of-type',
+					name : 'a.epinfo',
+					size : 'a.epinfo',
+					seed : 'a.epinfo',
+					href : 'https://eztv.ag/search/%_SERIAL_NAME_%-s%_SEASON_0_%e%_EPISODE_0_%-%_REQUEST_PARAM_%',
+					tr : 'tr.forum_header_border',
 				},
 			},
 			curTracker : 'kat',
@@ -146,7 +157,12 @@
 			for( var i=0; i<menu.length; i++ ){
 				var obj = menu[i];
 				if( obj.status != 0 ){
-					tdInnerHtml += '<li data-menu-id="'+obj.id+'"><a target="_blank" href="'+obj.href+'"><img alt="img" src="'+obj.icon+'">'+obj.desc+'</a></li>';
+					// Add data attrs with trackers info for magnet links 
+					var trackerData = ( obj.data!==undefined?'data-cur-tracker="'+settings.getVar('curTracker')+'" data-used-trackers="'+settings.getVar('curTracker')+'"':'' );
+					// Choose href attribute wisely
+					var trackerHref = ( obj.href!==undefined?obj.href:settings.getVar('trackers')[ settings.getVar('curTracker') ].href );
+
+					tdInnerHtml += '<li '+trackerData+' data-menu-id="'+obj.id+'"><a target="_blank" href="'+trackerHref+'"><img alt="img" src="'+obj.icon+'">'+obj.desc+'</a></li>';
 				}
 			}
 			tdInnerHtml += '</ul></div>';
@@ -212,35 +228,67 @@
 		},
 
 		prepare : function( value ){
+			// console.info( 'prepare value', value );
 			if( settings.getVar('prior') == 'size' ){
-				var res = (/(\d+\.\d+)\s+([MKG]B)/).exec( value );
+				var res = (/\((\d+\.\d+).+([MKG]B)\)/).exec( value.outerHTML );
+				// console.info( 'prepare first', res );
+				if( null == res ){
+					res = (/(\d+\.{0,1}\d{0,2}).+([MKG]B)/).exec( value.textContent );
+					// console.info( 'prepare second', res );
+				} 
 				if( null == res ) return 0;
 				value = +res[1] * ( res[2] == 'GB' ? 1000 : ( res[2] == 'GB' ? 0.001 : 1 ) );
 			}
+			// console.info( 'prepare ', value );
 			return value;
 		},
 
-		parse : function( nodeList ){
+		parse : function( nodeList, tracker ){
 			if( nodeList === null || nodeList === undefined ){
+				// console.info('parse::nodelisr error');
 				return false;
 			}
-			var tracker = settings.getVar('trackers')[ settings.getVar('curTracker') ];
-			var tr = nodeList.querySelectorAll('tr:not(.firstr)');
-			if( tr === null || tr === undefined ){
+			// var tracker = settings.getVar('trackers')[ settings.getVar('curTracker') ];
+			var tr = nodeList.querySelectorAll( tracker.tr );
+			if( tr === null || tr === undefined || tr.length === 0 ){
+				// console.info('parse::tracker.tr error', tr, nodeList.querySelectorAll( tracker.tr ), tracker.tr );
 				return false;
 			}
-			var tmp = tr[0];
+			var tmp = tr[0]; 
+			var t1 = this.prepare( tmp.querySelector( tracker[ settings.getVar('prior') ] ) );
 			for ( var i=1; i<tr.length; i++ ) {
-				var t1 = this.prepare( tmp.querySelector( tracker[ settings.getVar('prior') ] ) );
 				var t2 = this.prepare( tr[i].querySelector( tracker[ settings.getVar('prior') ] ) );
-				tmp = t1 < t2 ? tr[i] : tmp;
+				// console.info(t1, t2, t1 < t2);
+				if( t1 < t2 ){
+					tmp = tr[i];
+					t1 = t2;
+				}
+				// console.info(tmp);
 			};
 			return tmp;
 		},
 
+		hasNextTracker : function( a ){
+			var arr = a.parentElement.getAttribute('data-used-trackers').split(',');
+			for( tracker in settings.getVar('trackers') ){
+				if( arr.indexOf( tracker ) === -1 ){
+					a.parentElement.setAttribute('data-used-trackers', (a.parentElement.getAttribute('data-used-trackers')+','+tracker) );
+					a.parentElement.setAttribute('data-cur-tracker', tracker );
+					a.setAttribute('href', dropDawnMenu.render( settings.getVar('trackers')[ tracker ].href, dropDawnMenu.closest( a, 'tr' ) ) );
+					this.haveVisible = true;
+					this.list.push( dropDawnMenu.closest(a, 'tr') );
+					return true;
+				}
+			}
+			return false;
+		},
+
 		error : function( a, text ){
-			a.childNodes[0].setAttribute('src', settings.getMenuObjById( +li.getAttribute('data-menu-id') ).data.icon_f );
-			a.childNodes[1].textContent = text;
+			// console.info('enter error with ', text, ' for ',a.childNodes[1].textContent);
+			if( !this.hasNextTracker( a ) ){
+				a.childNodes[0].setAttribute('src', settings.getMenuObjById( +li.getAttribute('data-menu-id') ).data.icon_f );
+				a.childNodes[1].textContent = text;
+			}
 		},
 
 		getPage : function(){
@@ -249,21 +297,25 @@
 				return false;
 			}
 			var a = li.children[0];
-			var kat = settings.getVar('trackers').kat;
+			var tracker = settings.getVar('trackers')[ a.parentElement.getAttribute('data-cur-tracker') ];
+			// console.info( '----------------------------------' );
+			// console.info( 'sent ajax ', a.getAttribute('href') );
 			GM_xmlhttpRequest({
 				method : "GET",
 				url : a.getAttribute('href'),
 				responseType : 'document',
 				timeout : 60*1000,
 				onload : function( msg ){
+			// console.info( 'ajax onload ', a.getAttribute('href') );
 					if( msg !== null && msg.responseXML !== null ){
-						var tmp = _this.parse( msg.responseXML.documentElement.querySelector('.data') );
+						var tmp = _this.parse( msg.responseXML.documentElement.querySelector( tracker.table ), tracker );
 						if( tmp !== false ){
-							a.setAttribute('href', tmp.querySelector( kat.magnet ) );
+							// console.info('all OK for', a.getAttribute('href') );
+							a.setAttribute('href', tmp.querySelector( tracker.magnet ) );
 							a.childNodes[0].setAttribute('src', settings.getMenuObjById( +li.getAttribute('data-menu-id') ).data.icon_t );
 							a.childNodes[1].textContent = '('+
-								_this.prepare( tmp.querySelector( kat.size ).textContent )+
-								' MB) '+tmp.querySelector( kat.name ).textContent;
+								+_this.prepare( tmp.querySelector( tracker.size ) )+
+								' MB) '+tmp.querySelector( tracker.name ).textContent;
 						}else{
 							_this.error(a, "Магнет не найден");
 						}
@@ -284,7 +336,7 @@
 		run : function( list ){
 			this.list = [].slice.call(list);
 
-			for( var i=0; i<settings.getVar('threads'); i++ ){
+			for( var i=0; i<1; i++ ){
 				this.getPage();
 			}
 		}
