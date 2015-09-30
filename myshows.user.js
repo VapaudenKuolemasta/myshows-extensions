@@ -228,33 +228,42 @@
 		},
 
 		prepare : function( value ){
+			// console.info( 'prepare value', value );
 			if( settings.getVar('prior') == 'size' ){
-				var res = (/\((\d+\.\d+).+([MKG]B)\)/).exec( value );
+				var res = (/\((\d+\.\d+).+([MKG]B)\)/).exec( value.outerHTML );
+				// console.info( 'prepare first', res );
 				if( null == res ){
 					res = (/(\d+\.{0,1}\d{0,2}).+([MKG]B)/).exec( value.textContent );
+					// console.info( 'prepare second', res );
 				} 
 				if( null == res ) return 0;
 				value = +res[1] * ( res[2] == 'GB' ? 1000 : ( res[2] == 'GB' ? 0.001 : 1 ) );
 			}
+			// console.info( 'prepare ', value );
 			return value;
 		},
 
 		parse : function( nodeList, tracker ){
 			if( nodeList === null || nodeList === undefined ){
-				console.info('parse::nodelisr error');
+				// console.info('parse::nodelisr error');
 				return false;
 			}
 			// var tracker = settings.getVar('trackers')[ settings.getVar('curTracker') ];
 			var tr = nodeList.querySelectorAll( tracker.tr );
 			if( tr === null || tr === undefined || tr.length === 0 ){
-				console.info('parse::tracker.tr error', tr, nodeList.querySelectorAll( tracker.tr ), tracker.tr );
+				// console.info('parse::tracker.tr error', tr, nodeList.querySelectorAll( tracker.tr ), tracker.tr );
 				return false;
 			}
-			var tmp = tr[0];
+			var tmp = tr[0]; 
+			var t1 = this.prepare( tmp.querySelector( tracker[ settings.getVar('prior') ] ) );
 			for ( var i=1; i<tr.length; i++ ) {
-				var t1 = this.prepare( tmp.querySelector( tracker[ settings.getVar('prior') ] ) );
 				var t2 = this.prepare( tr[i].querySelector( tracker[ settings.getVar('prior') ] ) );
-				tmp = t1 < t2 ? tr[i] : tmp;
+				// console.info(t1, t2, t1 < t2);
+				if( t1 < t2 ){
+					tmp = tr[i];
+					t1 = t2;
+				}
+				// console.info(tmp);
 			};
 			return tmp;
 		},
@@ -275,7 +284,7 @@
 		},
 
 		error : function( a, text ){
-			console.info('enter error with ', text, ' for ',a.childNodes[1].textContent);
+			// console.info('enter error with ', text, ' for ',a.childNodes[1].textContent);
 			if( !this.hasNextTracker( a ) ){
 				a.childNodes[0].setAttribute('src', settings.getMenuObjById( +li.getAttribute('data-menu-id') ).data.icon_f );
 				a.childNodes[1].textContent = text;
@@ -289,20 +298,19 @@
 			}
 			var a = li.children[0];
 			var tracker = settings.getVar('trackers')[ a.parentElement.getAttribute('data-cur-tracker') ];
-			console.info( '----------------------------------' );
-			console.info( 'sent ajax ', a.getAttribute('href') );
+			// console.info( '----------------------------------' );
+			// console.info( 'sent ajax ', a.getAttribute('href') );
 			GM_xmlhttpRequest({
 				method : "GET",
 				url : a.getAttribute('href'),
 				responseType : 'document',
 				timeout : 60*1000,
 				onload : function( msg ){
-			console.info( 'ajax onload ', a.getAttribute('href') );
-			console.info( msg.responseXML.documentElement.querySelector( tracker.table ) );
+			// console.info( 'ajax onload ', a.getAttribute('href') );
 					if( msg !== null && msg.responseXML !== null ){
 						var tmp = _this.parse( msg.responseXML.documentElement.querySelector( tracker.table ), tracker );
 						if( tmp !== false ){
-							console.info('all OK for', a.getAttribute('href') );
+							// console.info('all OK for', a.getAttribute('href') );
 							a.setAttribute('href', tmp.querySelector( tracker.magnet ) );
 							a.childNodes[0].setAttribute('src', settings.getMenuObjById( +li.getAttribute('data-menu-id') ).data.icon_t );
 							a.childNodes[1].textContent = '('+
