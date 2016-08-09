@@ -3,8 +3,8 @@
 // @name 			Myshows Extentions
 // @version 		2.3
 // @description 	Для каждой серии добавляет меню с ссылками на торенты и субтитры и пытается найти магнет.
-// @include 		http://myshows.me/*
-// @match 			http://myshows.me/*
+// @include 		https://myshows.me/*
+// @match 			https://myshows.me/*
 // @grant 			GM_addStyle
 // @grant 			GM_xmlhttpRequest
 // ==/UserScript==
@@ -28,7 +28,7 @@
 					id : 1,
 					status : 1,
 					name : 'ThePirateBay',
-					href : 'https://piratebay.to/search/0/800/0/%_SERIAL_NAME_%+s%_SEASON_0_%e%_EPISODE_0_%+%_REQUEST_PARAM_%/0/DSeeder/1/',
+					href : 'https://thepiratebay.cr/search/%_SERIAL_NAME_%+s%_SEASON_0_%e%_EPISODE_0_%+%_REQUEST_PARAM_%/0/7/',
 					desc : 'Искать %_SERIAL_NAME_% s%_SEASON_0_%e%_EPISODE_0_% %_REQUEST_PARAM_% на ThePirateBay',
 					icon : 'https://piratebay.to/static/img/tpblogo_sm_ny.gif',
 				},
@@ -44,9 +44,9 @@
 					id : 3,
 					status : 1,
 					name : 'Kickass Torrents',
-					href : 'https://kat.cr/usearch/%_SERIAL_NAME_% s%_SEASON_0_%e%_EPISODE_0_%+%_REQUEST_PARAM_%/',
+					href : 'https://kickass.cd/search.php?q=%_SERIAL_NAME_% s%_SEASON_0_%e%_EPISODE_0_%+%_REQUEST_PARAM_%/',
 					desc : 'Искать %_SERIAL_NAME_% s%_SEASON_0_%e%_EPISODE_0_% на Kickass Torrents',
-					icon : 'https://kastatic.com/images/favicon.ico',
+					icon : 'http://kickass.cd/kastatic/favicon.ico',
 				},
 				{
 					id : 4,
@@ -75,20 +75,19 @@
 					name : '.cellMainLink',
 					size : 'td:nth-child(2)',
 					seed : 'td:nth-child(5)',
-					href : 'https://kat.cr/usearch/%_SERIAL_NAME_% s%_SEASON_0_%e%_EPISODE_0_% %_REQUEST_PARAM_%/',
+					href : 'https://kickass.cd/search.php?q=%_SERIAL_NAME_% s%_SEASON_0_%e%_EPISODE_0_% %_REQUEST_PARAM_%/',
 					tr : 'tr:not(.firstr)',
 				},
-				eztv : {
-					magnet : 'a.magnet',
-					table : 'table.forum_header_border:last-of-type',
-					name : 'a.epinfo',
-					size : 'a.epinfo',
-					seed : 'a.epinfo',
-					href : 'https://eztv.ag/search/%_SERIAL_NAME_%-s%_SEASON_0_%e%_EPISODE_0_%-%_REQUEST_PARAM_%',
-					tr : 'tr.forum_header_border',
-				},
+                tpb : {
+                    magnet : 'td > a:first-of-type',
+                    table : 'table#searchResult',
+                    name : '.detName a',
+                    size : 'font.detDesc',
+                    href : 'https://thepiratebay.cr/search/%_SERIAL_NAME_%+s%_SEASON_0_%e%_EPISODE_0_%+%_REQUEST_PARAM_%/0/7/',
+                    tr : 'tbody tr',
+                },
 			},
-			curTracker : 'kat',
+            curTracker : 'kat',
 		},
 
 		getVar : function( param ){
@@ -230,14 +229,14 @@
 		prepare : function( value ){
 			// console.info( 'prepare value', value );
 			if( settings.getVar('prior') == 'size' ){
-				var res = (/\((\d+\.\d+).+([MKG]B)\)/).exec( value.outerHTML );
+				var res = (/(\d+\.\d+).+([MKG]i?B)/).exec( value.outerHTML );
 				// console.info( 'prepare first', res );
 				if( null == res ){
-					res = (/(\d+\.{0,1}\d{0,2}).+([MKG]B)/).exec( value.textContent );
+					res = (/(\d+\.{0,1}\d{0,2}).+([MKG]i?B)/).exec( value.textContent );
 					// console.info( 'prepare second', res );
 				} 
 				if( null == res ) return 0;
-				value = +res[1] * ( res[2] == 'GB' ? 1000 : ( res[2] == 'GB' ? 0.001 : 1 ) );
+				value = +res[1] * ( (/(Gi?B)/).exec( res[2] ) ? 1000 : ( (/(Ki?B)/).exec( res[2] ) ? 0.001 : 1 ) );
 			}
 			// console.info( 'prepare ', value );
 			return value;
@@ -306,7 +305,7 @@
 				responseType : 'document',
 				timeout : 60*1000,
 				onload : function( msg ){
-			// console.info( 'ajax onload ', a.getAttribute('href') );
+    			// console.info( 'ajax onload ', a.getAttribute('href') );
 					if( msg !== null && msg.responseXML !== null ){
 						var tmp = _this.parse( msg.responseXML.documentElement.querySelector( tracker.table ), tracker );
 						if( tmp !== false ){
