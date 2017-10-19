@@ -16,14 +16,14 @@
         icon_f: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAsAAAALAQMAAACTYuVlAAAABlBMVEX/////AP/GWAgeAAAAAXRSTlMAQObYZgAAACRJREFUCNdjkGdgsG9g0GtgsG4AMUQZGO4nMDx4wAAUTzgARAB1OAh6LxmZMAAAAABJRU5ErkJggg==',
 
         trackers: [
-            // {
-            //     table: 'table#searchResult',
-            //     tr: 'tbody tr',
-            //     magnet: 'td > a:first-of-type',
-            //     name: '.detName a',
-            //     size: 'font.detDesc',
-            //     link: 'https://thepiratebay.org/search/%_SERIAL_NAME_%+s%_SEASON_0_%e%_EPISODE_0_%+%_REQUEST_PARAM_%/0/7/'
-            // },
+            {
+                table: 'table#searchResult',
+                tr: 'tbody tr',
+                magnet: 'td > a:first-of-type',
+                name: '.detName a',
+                size: 'font.detDesc',
+                link: 'https://thepiratebay.org/search/%_SERIAL_NAME_%+s%_SEASON_0_%e%_EPISODE_0_%+%_REQUEST_PARAM_%/0/7/'
+            },
             {
                 table: 'table.forum_header_border:last-of-type',
                 tr: 'tbody tr.forum_header_border',
@@ -32,6 +32,16 @@
                 size: 'td.forum_thread_post:nth-of-type(4)',
                 link: 'https://eztv.ag/search/%_SERIAL_NAME_%+s%_SEASON_0_%e%_EPISODE_0_%+%_REQUEST_PARAM_%'
             }
+        ],
+
+        constList: [
+            "%_SERIAL_NAME_%",
+            "%_SERIAL_NAME_RUS_%",
+            "%_SEASON_%",
+            "%_SEASON_0_%",
+            "%_EPISODE_%",
+            "%_EPISODE_0_%",
+            "%_REQUEST_PARAM_%"
         ]
     };
 
@@ -55,16 +65,6 @@
                 desc: 'Ищу магнет для %_SERIAL_NAME_% s%_SEASON_0_%e%_EPISODE_0_%',
                 icon: '/shared/img/vfs/ajax-loader.gif'
             }
-        ],
-
-        constList: [
-            "%_SERIAL_NAME_%",
-            "%_SERIAL_NAME_RUS_%",
-            "%_SEASON_%",
-            "%_SEASON_0_%",
-            "%_EPISODE_%",
-            "%_EPISODE_0_%",
-            "%_REQUEST_PARAM_%"
         ],
 
         style: '' +
@@ -96,15 +96,15 @@
 
         getShowMenu: function (listElement) {
             var menu = this.getMenuDummy();
-            var data = this.getShowData(listElement);
+            var data = this.getEpisodeData(listElement);
 
-            for (var i = 0; i < this.constList.length; i++) {
-                menu = menu.replace(new RegExp(this.constList[i], 'g'), data[i]);
+            for (var i = 0; i < settings.constList.length; i++) {
+                menu = menu.replace(new RegExp(settings.constList[i], 'g'), data[i]);
             }
             return menu;
         },
 
-        getShowData: function (listElement) {
+        getEpisodeData: function (listElement) {
             var showId = this.closest(listElement, '[data-show-id]').getAttribute('data-show-id');
 
             var serial_name = document.getElementById('s' + showId).children[0].children[1].textContent;
@@ -136,51 +136,57 @@
     ajaxHandler = {
         Request: function () {
 
-            if(!list.length){
+            if (!list.length) {
                 return;
             }
 
-            this.tracker = settings.trackers[0];
+            this.t_id = 0;
+            this.tracker = settings.trackers[this.t_id];
 
-            this.send = function(){
-                var listElement = list[0];
-                list.shift();
+            this.listElement = list[0];
+            list.shift();
 
+            this.send = function () {
                 var _this = this;
-                var showOption = listElement.lastChild.querySelector('li:last-child a');
+                var showOption = this.listElement.lastChild.querySelector('li:last-child a');
+
+                var url = this.tracker.link;
+                var episodeData = dropDawnMenu.getEpisodeData(this.listElement);
+                for (var i = 0; i < settings.constList.length; i++) {
+                    url = url.replace(new RegExp(settings.constList[i], 'g'), episodeData[i]);
+                }
 
                 GM_xmlhttpRequest({
                     method: "GET",
-                    url: showOption.getAttribute('href'),
+                    url: url,
                     responseType: 'document',
                     timeout: 30 * 1000,
 
                     onload: function (msg) {
-                        // _this.send();
-
                         if (msg == null && msg.responseXML == null) {
-                            _this.showError(showOption, "Сайт вернул пустой ответ");
+                            _this.errorHandler(showOption, "Сайт вернул пустой ответ");
                             return
                         }
 
                         var magnetData = _this.getMagnetData(msg.responseXML);
-                        console.info(magnetData);
 
                         if (magnetData === false) {
-                            _this.showError(showOption, "Магнет не найден");
+                            _this.errorHandler(showOption, "Магнет не найден");
                             return
                         }
 
                         _this.updateMenu(showOption, magnetData);
-                        console.info('end.');
+
+                        var request = new ajaxHandler.Request();
+                        request.send();
                     },
 
                     onerror: function () {
-                        _this.showError(showOption, "Ошибка доступа к сайту");
+                        _this.errorHandler(showOption, "Ошибка доступа к сайту");
                     },
 
                     ontimeout: function () {
-                        _this.showError(showOption, "Время ожидания ответа сайта закончилось");
+                        _this.errorHandler(showOption, "Время ожидания ответа сайта закончилось");
                     }
                 });
             };
@@ -201,10 +207,19 @@
                 return value;
             };
 
-            this.showError = function (a, text) {
-                console.warn(text);
-                a.childNodes[0].setAttribute('src', settings.icon_f);
-                a.childNodes[1].textContent = text;
+            this.errorHandler = function (a, text) {
+                this.t_id++;
+                this.tracker = settings.trackers[this.t_id];
+
+                if (this.tracker) {
+                    this.send();
+                } else {
+                    a.childNodes[0].setAttribute('src', settings.icon_f);
+                    a.childNodes[1].textContent = text;
+
+                    var request = new ajaxHandler.Request();
+                    request.send();
+                }
             };
 
             this.getMagnetData = function (data) {
@@ -217,7 +232,6 @@
                 if (rowList === null || rowList === undefined || rowList.length === 0) {
                     return false;
                 }
-                console.info(rowList);
 
                 var magnetData = rowList[0];
                 var curSize = 0;
@@ -238,8 +252,6 @@
                 var href = magnetData.querySelector(this.tracker.magnet);
                 var name = magnetData.querySelector(this.tracker.name);
                 var size = this.getSizeMB(magnetData.querySelector(this.tracker.size).textContent);
-
-                console.info(href, name, size);
 
                 showOption.setAttribute('href', href);
                 showOption.childNodes[0].setAttribute('src', settings.icon_t);
