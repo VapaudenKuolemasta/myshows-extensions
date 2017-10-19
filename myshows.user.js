@@ -1,7 +1,7 @@
 // ==UserScript==
 // @id              myshows
 // @name            Myshows Extensions
-// @version         3.0
+// @version         4.0
 // @description     Для каждой серии добавляет меню с ссылками на торенты и субтитры и пытается найти магнет.
 // @include         https://myshows.me/*
 // @match           https://myshows.me/*
@@ -16,16 +16,26 @@
         icon_f: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAsAAAALAQMAAACTYuVlAAAABlBMVEX/////AP/GWAgeAAAAAXRSTlMAQObYZgAAACRJREFUCNdjkGdgsG9g0GtgsG4AMUQZGO4nMDx4wAAUTzgARAB1OAh6LxmZMAAAAABJRU5ErkJggg==',
 
         trackers: [
+            // {
+            //     table: 'table#searchResult',
+            //     tr: 'tbody tr',
+            //     magnet: 'td > a:first-of-type',
+            //     name: '.detName a',
+            //     size: 'font.detDesc',
+            //     link: 'https://thepiratebay.org/search/%_SERIAL_NAME_%+s%_SEASON_0_%e%_EPISODE_0_%+%_REQUEST_PARAM_%/0/7/'
+            // },
             {
-                magnet: 'td > a:first-of-type',
-                table: 'table#searchResult',
-                name: '.detName a',
-                size: 'font.detDesc',
-                link: 'https://thepiratebay.org/search/%_SERIAL_NAME_%+s%_SEASON_0_%e%_EPISODE_0_%+%_REQUEST_PARAM_%/0/7/',
-                tr: 'tbody tr'
+                table: 'table.forum_header_border:last-of-type',
+                tr: 'tbody tr.forum_header_border',
+                magnet: 'a.magnet',
+                name: 'a.epinfo',
+                size: 'td.forum_thread_post:nth-of-type(4)',
+                link: 'https://eztv.ag/search/%_SERIAL_NAME_%+s%_SEASON_0_%e%_EPISODE_0_%+%_REQUEST_PARAM_%'
             }
         ]
     };
+
+    list = [].slice.call(document.querySelectorAll('.seasonBlockBody > table > tbody > tr'));
 
     dropDawnMenu = {
 
@@ -113,8 +123,6 @@
         },
 
         addDropDawnMenu: function () {
-            var list = document.querySelectorAll('.seasonBlockBody > table > tbody > tr');
-
             for (var i = 0; i < list.length; i++) {
                 var td = document.createElement('td');
                 td.innerHTML = this.getShowMenu(list[i]);
@@ -126,114 +134,123 @@
     };
 
     ajaxHandler = {
+        Request: function () {
 
-        list: [],
-
-        getSizeMB: function (value) {
-            var res = (/(\d+\.\d+).+([MKG]i?B)/).exec(value);
-
-            if (null == res) return 0;
-            value =
-                +res[1] * ((/(Gi?B)/).exec(res[2]) ?
-                    1000 :
-                    (
-                        (/(Ki?B)/).exec(res[2]) ?
-                            0.001 :
-                            1)
-                );
-
-            return value;
-        },
-
-        getMagnetData: function (data) {
-            var nodeList = data.documentElement.querySelector(settings.trackers[0].table);
-            if (nodeList === null || nodeList === undefined) {
-                return false;
+            if(!list.length){
+                return;
             }
 
-            var rowList = nodeList.querySelectorAll(settings.trackers[0].tr);
-            if (rowList === null || rowList === undefined || rowList.length === 0) {
-                return false;
-            }
+            this.tracker = settings.trackers[0];
 
-            var magnetData = rowList[0];
-            var curSize = 0;
-            var maxSize = 0;
+            this.send = function(){
+                var listElement = list[0];
+                list.shift();
 
-            for (var i = 0; i < rowList.length; i++) {
-                curSize = this.getSizeMB(rowList[i].querySelector(settings.trackers[0].size).textContent);
-                if (maxSize < curSize) {
-                    magnetData = rowList[i];
-                    maxSize = curSize;
-                }
-            }
+                var _this = this;
+                var showOption = listElement.lastChild.querySelector('li:last-child a');
 
-            return magnetData;
-        },
+                GM_xmlhttpRequest({
+                    method: "GET",
+                    url: showOption.getAttribute('href'),
+                    responseType: 'document',
+                    timeout: 30 * 1000,
 
-        showError: function (a, text) {
-            a.childNodes[0].setAttribute('src', settings.icon_f);
-            a.childNodes[1].textContent = text;
-        },
+                    onload: function (msg) {
+                        // _this.send();
 
-        updateMenu: function (showOption, magnetData) {
-            var href = magnetData.querySelector(settings.trackers[0].magnet);
-            var name = magnetData.querySelector(settings.trackers[0].name);
-            var size = this.getSizeMB(magnetData.querySelector(settings.trackers[0].size).textContent);
+                        if (msg == null && msg.responseXML == null) {
+                            _this.showError(showOption, "Сайт вернул пустой ответ");
+                            return
+                        }
 
-            showOption.setAttribute('href', href);
-            showOption.childNodes[0].setAttribute('src', settings.icon_t);
-            showOption.childNodes[1].textContent = '(' + size + ' MB) ' + name.textContent;
-        },
+                        var magnetData = _this.getMagnetData(msg.responseXML);
+                        console.info(magnetData);
 
-        sendRequest: function () {
-            if (this.list.length <= 0) {
-                return false;
-            }
+                        if (magnetData === false) {
+                            _this.showError(showOption, "Магнет не найден");
+                            return
+                        }
 
-            var _this = this;
-            var showOption = this.list[0].lastChild.querySelector('li:last-child a');
-            this.list.shift();
+                        _this.updateMenu(showOption, magnetData);
+                        console.info('end.');
+                    },
 
-            GM_xmlhttpRequest({
-                method: "GET",
-                url: showOption.getAttribute('href'),
-                responseType: 'document',
-                timeout: 30 * 1000,
+                    onerror: function () {
+                        _this.showError(showOption, "Ошибка доступа к сайту");
+                    },
 
-                onload: function (msg) {
-                    _this.sendRequest();
-
-                    if (msg == null && msg.responseXML == null) {
-                        _this.showError(showOption, "Сайт вернул пустой ответ");
-                        return
+                    ontimeout: function () {
+                        _this.showError(showOption, "Время ожидания ответа сайта закончилось");
                     }
+                });
+            };
 
-                    var magnetData = _this.getMagnetData(msg.responseXML);
+            this.getSizeMB = function (value) {
+                var res = (/(\d+\.\d+).+([MKG]i?B)/).exec(value);
 
-                    if (magnetData === false) {
-                        _this.showError(showOption, "Магнет не найден");
-                        return
-                    }
+                if (null == res) return 0;
+                value =
+                    +res[1] * ((/(Gi?B)/).exec(res[2]) ?
+                        1000 :
+                        (
+                            (/(Ki?B)/).exec(res[2]) ?
+                                0.001 :
+                                1)
+                    );
 
-                    _this.updateMenu(showOption, magnetData);
-                },
+                return value;
+            };
 
-                onerror: function () {
-                    _this.showError(showOption, "Ошибка доступа к сайту");
-                },
+            this.showError = function (a, text) {
+                console.warn(text);
+                a.childNodes[0].setAttribute('src', settings.icon_f);
+                a.childNodes[1].textContent = text;
+            };
 
-                ontimeout: function () {
-                    _this.showError(showOption, "Время ожидания ответа сайта закончилось");
+            this.getMagnetData = function (data) {
+                var nodeList = data.documentElement.querySelector(this.tracker.table);
+                if (nodeList === null || nodeList === undefined) {
+                    return false;
                 }
-            });
+
+                var rowList = nodeList.querySelectorAll(this.tracker.tr);
+                if (rowList === null || rowList === undefined || rowList.length === 0) {
+                    return false;
+                }
+                console.info(rowList);
+
+                var magnetData = rowList[0];
+                var curSize = 0;
+                var maxSize = 0;
+
+                for (var i = 0; i < rowList.length; i++) {
+                    curSize = this.getSizeMB(rowList[i].querySelector(this.tracker.size).textContent);
+                    if (maxSize < curSize) {
+                        magnetData = rowList[i];
+                        maxSize = curSize;
+                    }
+                }
+
+                return magnetData;
+            };
+
+            this.updateMenu = function (showOption, magnetData) {
+                var href = magnetData.querySelector(this.tracker.magnet);
+                var name = magnetData.querySelector(this.tracker.name);
+                var size = this.getSizeMB(magnetData.querySelector(this.tracker.size).textContent);
+
+                console.info(href, name, size);
+
+                showOption.setAttribute('href', href);
+                showOption.childNodes[0].setAttribute('src', settings.icon_t);
+                showOption.childNodes[1].textContent = '(' + size + ' MB) ' + name.textContent;
+            };
         },
 
         getMagnetsLinks: function () {
-            this.list = [].slice.call(document.querySelectorAll('.seasonBlockBody > table > tbody > tr'));
-
-            for (var i = 0; i < 5; i++) {
-                this.sendRequest();
+            for (var i = 0; i < 1; i++) {
+                var request = new this.Request();
+                request.send();
             }
         }
     };
