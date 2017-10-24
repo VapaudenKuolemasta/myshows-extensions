@@ -158,7 +158,7 @@
 
                 GM_xmlhttpRequest({
                     method: "GET",
-                    url: url,
+                    url: url.replace(/\w*'\w*/, ''),
                     responseType: 'document',
                     timeout: 30 * 1000,
 
