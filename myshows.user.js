@@ -1,7 +1,7 @@
 // ==UserScript==
 // @id              myshows
 // @name            Myshows Extensions
-// @version         4.0
+// @version         4.1
 // @description     Для каждой серии добавляет меню с ссылками на торенты и субтитры и пытается найти магнет.
 // @include         https://myshows.me/*
 // @match           https://myshows.me/*
@@ -146,14 +146,15 @@
             this.listElement = list[0];
             list.shift();
 
+            this.episodeData = dropDawnMenu.getEpisodeData(this.listElement);
+
             this.send = function () {
                 var _this = this;
                 var showOption = this.listElement.lastChild.querySelector('li:last-child a');
 
                 var url = this.tracker.link;
-                var episodeData = dropDawnMenu.getEpisodeData(this.listElement);
                 for (var i = 0; i < settings.constList.length; i++) {
-                    url = url.replace(new RegExp(settings.constList[i], 'g'), episodeData[i]);
+                    url = url.replace(new RegExp(settings.constList[i], 'g'), this.episodeData[i]);
                 }
 
                 GM_xmlhttpRequest({
@@ -222,6 +223,19 @@
                 }
             };
 
+            // Отсеиваем левые результаты, которые трекер нам подсовывает, когда не может найти то, что нам нужно
+            this.validateEpisodeName = function (episodeName) {
+                var validNameArray = this.episodeData[0].replace(/\w*'\w*/, '').replace(/(^|\s)\w{1,3}\s/, ' ').split(' ');
+                for (var i = 0; i < validNameArray.length; i++) {
+                    if (episodeName.indexOf(validNameArray[i]) < 0) {
+                        return false;
+                    }
+                }
+
+                var seasonEpisode = 's' + this.episodeData[0] + 'e' + this.episodeData[0];
+                return episodeName.toLowerCase().indexOf(seasonEpisode) < 0;
+            };
+
             this.getMagnetData = function (data) {
                 var nodeList = data.documentElement.querySelector(this.tracker.table);
                 if (nodeList === null || nodeList === undefined) {
@@ -233,11 +247,12 @@
                     return false;
                 }
 
-                var magnetData = rowList[0];
+                var magnetData = false;
                 var curSize = 0;
                 var maxSize = 0;
 
                 for (var i = 0; i < rowList.length; i++) {
+                    if (!this.validateEpisodeName(rowList[i].querySelector(this.tracker.name).textContent)) continue;
                     curSize = this.getSizeMB(rowList[i].querySelector(this.tracker.size).textContent);
                     if (maxSize < curSize) {
                         magnetData = rowList[i];
