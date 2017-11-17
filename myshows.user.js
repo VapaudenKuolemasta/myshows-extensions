@@ -1,12 +1,15 @@
 // ==UserScript==
 // @id              myshows
 // @name            Myshows Extensions
-// @version         4.1
+// @version         4.2
 // @description     Для каждой серии добавляет меню с ссылками на торенты и субтитры и пытается найти магнет.
 // @include         https://myshows.me/*
 // @match           https://myshows.me/*
 // @grant           GM_addStyle
 // @grant           GM_xmlhttpRequest
+// @connect         myshows.me
+// @connect         thepiratebay.org
+// @connect         eztv.ag
 // ==/UserScript==
 
 (function myshows_extension() {
@@ -160,20 +163,22 @@
                 GM_xmlhttpRequest({
                     method: "GET",
                     url: url.replace(/\w*'\w*/, ''),
-                    responseType: 'document',
                     timeout: 30 * 1000,
 
                     onload: function (msg) {
-                        if (msg == null && msg.responseXML == null) {
+                        if (msg == null && msg.response == null) {
                             _this.errorHandler(showOption, "Сайт вернул пустой ответ");
-                            return
+                            return;
                         }
 
-                        var magnetData = _this.getMagnetData(msg.responseXML);
+                        var responseContent = document.implementation.createHTMLDocument().documentElement;
+                        responseContent.innerHTML = msg.responseText;
+
+                        var magnetData = _this.getMagnetData(responseContent);
 
                         if (magnetData === false) {
                             _this.errorHandler(showOption, "Магнет не найден");
-                            return
+                            return;
                         }
 
                         _this.updateMenu(showOption, magnetData);
@@ -237,7 +242,7 @@
             };
 
             this.getMagnetData = function (data) {
-                var nodeList = data.documentElement.querySelector(this.tracker.table);
+                var nodeList = data.querySelector(this.tracker.table);
                 if (nodeList === null || nodeList === undefined) {
                     return false;
                 }
@@ -284,5 +289,19 @@
 
     dropDawnMenu.addDropDawnMenu();
     ajaxHandler.getMagnetsLinks();
+
+    // Tampermonkey fix
+    var redButtons = document.getElementsByClassName("buttonPopup red");
+    for (var i = 0; i < redButtons.length; i++) {
+        redButtons[i].onclick = function (e) {
+            for (var j = 0; j < redButtons.length; j++) {
+                if (redButtons[j] !== e.target) {
+                    redButtons[j].classList.remove('_hover');
+                }
+            }
+
+            e.target.classList.toggle('_hover');
+        }
+    }
 
 })();
